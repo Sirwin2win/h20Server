@@ -1,14 +1,15 @@
 const Product = require('../models/productModel.js');
 const fs = require("fs");
 const path = require("path");
+const pool = require('../config/database');
 
 
 
 // Get all Products
 const getProducts = async (req, res)=>{
     try {
-        const products = await Product.find({});
-        res.status(200).json(products); 
+        const [rows] = await pool.query('SELECT * FROM products');
+            res.json(rows);
     } catch (error) {
         res.status(500).json({message:error.message}); 
     }   
@@ -19,8 +20,8 @@ const getProducts = async (req, res)=>{
 const getProduct = async(req, res)=>{
     try {
         const {id} = req.params;
-        const product = await Product.findById(id);
-        res.status(200).json(product);
+       const [rows] = await pool.query("SELECT * FROM products WHERE id = 'id'");
+            res.json(rows);
     } catch (error) {
         res.status(500).json({message:error.message}); 
     }
@@ -47,18 +48,18 @@ const createProduct = async (req, res)=>{
 
 // Update a Product
 
-const updatedProduct = async (req, res)=>{
-    try {
-        // Get id from the request
-        const {id} = req.params;
+const updatedProduct = async (req, res) => {
+  try {
+    // Get id from the request
+    const { id } = req.params;
 
-              // Find the item by ID
+    // Find the item by ID
     const item = await Product.findById(id);
     if (!item) {
       return res.status(404).json({ msg: "Item not found" });
     }
 
-         // Delete associated image file
+    // Delete associated image file
     if (item.image) {
       const imagePath = path.join(__dirname, "../../upload", item.image);
       fs.unlink(imagePath, (err) => {
@@ -68,16 +69,23 @@ const updatedProduct = async (req, res)=>{
       });
     }
 
-        // Save detail on the database
-        const product = await Product.findByIdAndUpdate(id, req.body);
-        if(!product){
-            return res.status(400).json({message: "Product not found"});
-        }
-        const updatedProduct = await Product.findById(id);
-        res.status(200).json(updatedProduct);
-    } catch (error) {
-        res.status(500).json({message:error.message}); 
+    // Save detail on the database
+    req.body = {
+      title: req.body.title,
+      description: req.body.description,
+      price: req.body.price,
+      image: req.file.filename,
+    };
+    console.log(req.file.filename);
+    const product = await Product.findByIdAndUpdate(id, req.body);
+    if (!product) {
+      return res.status(400).json({ message: "Product not found" });
     }
+    const updatedProduct = await Product.findById(id);
+    res.status(200).json(updatedProduct);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 // Delete a Product
