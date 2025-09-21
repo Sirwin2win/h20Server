@@ -1,54 +1,65 @@
-const User = require('../models/userModel')
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const nodemailer = require('nodemailer')
+const db = require('../config/database')
 
 
 exports.register = async (req, res) =>{
    
-          const  {name,email,phone,password,role} = req.body
-          const checkUser = await User.findOne({email})
-          if(checkUser) return res.json({success:false, message:"User email already exists"})
-             try {
-  const hashedPassword = await bcrypt.hash(password,12)
-
-  const newUser = new User({name,email,phone,password:hashedPassword,role})
-  await newUser.save()
-  res.status(201).json({message:`User registered with email ${email}`})
-    } catch (error) {
-         res.status(500).json({success:false,message:`Something went wrong`})
+          const  {name,email,phone,address,role} = req.body
+   // Simple validation
+    if (!name || !email  ||!phone || !address ||!role) {
+      return res.status(400).json({ message: 'All fields are required' });
     }
+  
+    // Check if user already exists
+    db.query(
+      'SELECT * FROM users WHERE email = ?',
+      [email],
+      async (err, results) => {
+        if (err) return res.status(500).json({ message: 'Database error' });
+  
+        if (results.length > 0) {
+          return res.status(409).json({ message: 'User already exists' });
+        }
+  
+        // Hash password
+        const password= await bcrypt.hash(req.body.password, 10);
+     
+        // Insert new user
+        db.query(
+          'INSERT INTO users (name, email, password, phone, address, role) VALUES (?, ?, ?,?,?,?)',
+          [name, email, password, phone, address, role],
+          (err, result) => {
+            if (err) return res.status(500).json({ message: 'Error creating user' });
+  
+            res.status(201).json({ message: 'User registered successfully' });
+          }
+        );
+      }
+    );
 
 };
 
 exports.login = async(req, res)=>{
 const {email,password} = req.body
-try {
-    const user = await User.findOne({email})
-    if(!user){
-        return res.status(404).json({message:`User with email ${email} not found`})
-    }
-    // if(user && (await bcrypt.compare(password,user.password))){
-    //     res.json({
-    //         _id:user.id,
-    //         name:user.name,
-    //         email:user.email,
-    //         token:generateToken(user._id),
-    //     })
-    // }else{
-    //     res.status(400).json({
-    //         success:false,
-    //         message:"Invalid Credentials"
-    //     })
-//     const generateToken = (id)=>{
-//     return jwt.sign({id},process.env.JWT_SECRET,{expiresIn:'30d'})
-// }
-    // }
 
-    const isMatch = await bcrypt.compare(password,user.password)
-    if(!isMatch){
-        return res.status(404).json({message:`Invalid credentials`})
-    }
+    // Check user
+     db.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+       if (err) return res.status(500).json({ message: 'Database error' });
+   
+       if (results.length === 0) {
+         return res.status(401).json({ message: 'Invalid email or password' });
+       }
+   
+       const user = results[0];
+
+         // Compare password
+           const match = await bcrypt.compare(password, user.password);
+           if (!match) {
+             return res.status(401).json({ message: 'Invalid email or password' });
+           }
+    
     const token = jwt.sign({id:user._id, role:user.role, email:user.email},process.env.JWT_SECRET, {expiresIn:"1h"})
     res.cookie('token', token,{httpOnly:true,secure:false}).json({
         success:true,
@@ -58,14 +69,7 @@ try {
         id:user._d,
         token
     })
-} catch (error) {
-    res.json({
-        success:false,
-        message:`Something went wrong ${error.message}`
-    })
-    
-
-}
+  })
 
 
 };

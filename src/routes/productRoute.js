@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require('fs')
 const {
     getProducts,
+    getSixProducts,
     getProduct,
     createProduct,
     updatedProduct,
@@ -18,6 +19,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 router.get('/', getProducts);
+router.get('/six', getProducts);
 router.get('/:id', getProduct);
 router.post('/',upload.single('image'), createProduct);
 router.put('/:id', upload.single('image'), updatedProduct);
